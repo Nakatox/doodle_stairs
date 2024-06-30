@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Doodle stairs</title>
+    <style>
+        canvas {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const playerImage = new Image();
+        playerImage.src = './doodler.webp';
+        const platformImage = new Image();
+        platformImage.src = './platform.png';
+
+        let score = 0;
+
+        let playerX = 50, playerY = 550;
+        const playerWidth = 50, playerHeight = 50;
+        const speed = 10;
+        let verticalVelocity = 0;
+        const gravity = 0.5;
+        let onGround = true;
+        let playerDirection = 'right';
+
+        let cameraOffsetX = 0;
+        let cameraOffsetY = 0;
+
+        //stairs, because I need to add stairs to follow the rule
+        const platforms = [
+            { x: 50, y: 520, width: 70, height: 20 },
+            { x: 100, y: 500, width: 70, height: 20 },
+            { x: 150, y: 480, width: 70, height: 20 },
+            { x: 200, y: 460, width: 70, height: 20 },
+            { x: 250, y: 440, width: 70, height: 20 },
+            { x: 300, y: 420, width: 70, height: 20 },
+            { x: 350, y: 400, width: 70, height: 20 },
+            { x: 400, y: 380, width: 70, height: 20 },
+            { x: 450, y: 360, width: 70, height: 20 },
+            { x: 500, y: 340, width: 70, height: 20 },
+            { x: 550, y: 320, width: 70, height: 20 },
+            { x: 600, y: 300, width: 70, height: 20 },
+            { x: 650, y: 280, width: 70, height: 20 },
+            { x: 700, y: 260, width: 70, height: 20 },
+            { x: 750, y: 240, width: 70, height: 20 }
+        ];
+
+        const canvasHeight = 600;
+        const maxJumpHeight = 60;
+
+        function generatePlatforms(initialPlatformY, stopGeneratingAtY) {
+            let currentY = initialPlatformY || platforms[0].y - maxJumpHeight + Math.random() * 20;
+            while (currentY > stopGeneratingAtY) {
+                const platformWidth = 70;
+                const platformHeight = 20;
+                const x = 600 + Math.random() * (canvas.width - platformWidth - 400);
+                platforms.push({ x, y: currentY, width: platformWidth, height: platformHeight });
+                currentY -= (maxJumpHeight - 20) + Math.random() * 20;
+            }
+        }
+        generatePlatforms(200, -6000);
+
+        const keys = {
+            ArrowUp: false,
+            ArrowLeft: false,
+            ArrowRight: false
+        };
+
+        function drawPlatforms() {
+            platforms.forEach(platform => {
+                ctx.drawImage(platformImage, platform.x - cameraOffsetX, platform.y - cameraOffsetY, platform.width, platform.height);
+            });
+        }
+
+        function drawPlayer() {
+            ctx.save();
+            if (playerDirection === 'left') {
+                ctx.translate(playerX + playerWidth - cameraOffsetX, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(playerImage, 0, playerY - cameraOffsetY, playerWidth, playerHeight);
+            } else {
+                ctx.drawImage(playerImage, playerX - cameraOffsetX, playerY - cameraOffsetY, playerWidth, playerHeight);
+            }
+            ctx.restore();
+        }
+
+        function easeInOutQuad(t, b, c, d) {
+            t /= d / 2;
+            if (t < 1) return c / 2 * t * t + b;
+            t--;
+            return -c / 2 * (t * (t - 2) - 1) + b;
+        }
+
+        let cameraEaseDuration = 100;
+        let cameraLastUpdate = Date.now();
+
+        function updateCameraPosition() {
+            let now = Date.now();
+            let timeElapsed = now - cameraLastUpdate;
+            cameraLastUpdate = now;
+
+            let targetCameraOffsetX = playerX - canvas.width / 2 + playerWidth / 2;
+            let targetCameraOffsetY = playerY - canvas.height / 2 + playerHeight / 2;
+
+            let diffX = targetCameraOffsetX - cameraOffsetX;
+            let diffY = targetCameraOffsetY - cameraOffsetY;
+
+            if (timeElapsed < cameraEaseDuration) {
+                cameraOffsetX += easeInOutQuad(timeElapsed, 0, diffX, cameraEaseDuration);
+                cameraOffsetY += easeInOutQuad(timeElapsed, 0, diffY, cameraEaseDuration);
+            } else {
+                cameraOffsetX = targetCameraOffsetX;
+                cameraOffsetY = targetCameraOffsetY;
+            }
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function updatePlayerPosition() {
+            if (keys.ArrowLeft) {
+                playerX -= speed;
+                playerDirection = 'left';
+            }
+            if (keys.ArrowRight) {
+                playerX += speed;
+                playerDirection = 'right';
+            }
+            if (keys.ArrowUp && onGround) {
+                verticalVelocity = -10;
+                onGround = false;
+            }
+            if (!onGround) {
+                verticalVelocity += gravity;
+                playerY += verticalVelocity;
+            }
+
+            let currentScore = Math.max(score, canvasHeight - playerY);
+            if (currentScore > score) {
+                score = currentScore;
+            }
+
+            onGround = false;
+            platforms.forEach(platform => {
+                const onPlatformHorizontally = playerX +5< platform.x + platform.width && playerX + playerWidth-5 > platform.x;
+                const onPlatformVertically = playerY + playerHeight <= platform.y && playerY + playerHeight + verticalVelocity >= platform.y;
+
+                if (onPlatformHorizontally && onPlatformVertically) {
+                    playerY = platform.y - playerHeight;
+                    verticalVelocity = 0;
+                    onGround = true;
+                } else if (onPlatformHorizontally && playerY + playerHeight > platform.y && playerY < platform.y + platform.height) {
+                    if (keys.ArrowRight && platform.x > playerX) {
+                        const angle = Math.atan2(platform.height, platform.width);
+                        const ascentRate = Math.sin(angle) * speed * 2;
+                        playerY -= ascentRate;
+                        onGround = true;
+                    }
+                }
+            });
+
+            if (playerY >= 550) {
+                playerY = 550;
+                verticalVelocity = 0;
+                onGround = true;
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key in keys) {
+                keys[e.key] = true;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key in keys) {
+                keys[e.key] = false;
+            }
+        });
+
+        function drawBackground() {
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
+            const tileSize = 40;
+            ctx.fillStyle = '#f5f5dc';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+            ctx.strokeStyle = '#bfbf91';
+            for (let x = -cameraOffsetX % tileSize; x <= canvasWidth; x += tileSize) {
+                for (let y = -cameraOffsetY % tileSize; y <= canvasHeight; y += tileSize) {
+                    ctx.strokeRect(x, y, tileSize, tileSize);
+                }
+            }
+        }
+
+        function gameLoop() {
+            clearCanvas();
+            drawBackground();
+            updatePlayerPosition();
+            updateCameraPosition();
+            drawPlayer();
+            drawPlatforms();
+            displayScore();
+            requestAnimationFrame(gameLoop);
+
+            ctx.font = '40px Arial';
+            ctx.fillStyle = 'green';
+            if (score >= 6600) {
+                ctx.fillText('Haha ! no more stairs ! you cannot continue !', 0, canvas.height / 4);
+                ctx.fillText('(but GG)', 0, canvas.height / 4 + 50);
+            }
+            else
+            if (score >= 5000) {
+                ctx.fillText('no, I wont, but I want to !', canvas.width / 2 - 250, canvas.height / 4);
+            }
+            else
+            if (score >= 4000) {
+                ctx.fillText('I will display a rick roll if you continue', 20, canvas.height / 4);
+            }
+            else
+            if (score >= 3000) {
+                ctx.fillText('You know that there is not point right ?', 50, canvas.height / 4);
+            }
+            else
+            if (score >= 2000) {
+                ctx.fillText('Why do you continue ?', canvas.width / 2 - 150, canvas.height / 4);
+            }
+            else if (score >= 1000) {
+
+                ctx.fillText('Nice you won!', canvas.width / 2 - 100, canvas.height / 4);
+            }
+        }
+
+        function displayScore() {
+            ctx.font = '20px Arial';
+            ctx.fillStyle = 'black';
+            ctx.fillText(`Score: ${Math.round(score)}`, 10, 30);
+        }
+
+        playerImage.onload = function () {
+            cameraLastUpdate = Date.now();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+
+</html>
