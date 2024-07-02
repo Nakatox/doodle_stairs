@@ -201,6 +201,7 @@
             }
         }
 
+        const fps = 65;
         function gameLoop() {
             clearCanvas();
             drawBackground();
@@ -209,7 +210,10 @@
             drawPlayer();
             drawPlatforms();
             displayScore();
-            requestAnimationFrame(gameLoop);
+            setTimeout(function() {
+               requestAnimationFrame(gameLoop);
+            }, 1000 / fps);
+ 
 
             ctx.font = '40px Arial';
             ctx.fillStyle = 'green';
